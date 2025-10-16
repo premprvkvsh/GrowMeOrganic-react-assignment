@@ -5,7 +5,6 @@ import { OverlayPanel } from 'primereact/overlaypanel';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
 import { Skeleton } from 'primereact/skeleton';
-import { ProgressBar } from 'primereact/progressbar';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
@@ -21,8 +20,6 @@ export default function Gallery() {
   const [items, setItems] = useState<ArtworkData[]>([]);
   const [selectedRows, setSelectedRows] = useState<ArtworkData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isBulkSelecting, setIsBulkSelecting] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const [bulkCount, setBulkCount] = useState<number | null | undefined>(null);
@@ -65,59 +62,46 @@ export default function Gallery() {
   const handleBulkSelection = async () => {
     if (!bulkCount || bulkCount < 1) return;
 
-    setIsBulkSelecting(true);
-    setBulkProgress(0);
+    overlayRef.current?.hide();
+    
+    // Show loading immediately
+    setIsLoading(true);
+    
     const idsToSelect: number[] = [];
-    let collected = 0;
-    let pageNum = 1;
+    const pagesToFetch = Math.ceil(bulkCount / ITEMS_PER_PAGE);
 
     try {
-      // Fetch pages in parallel (batches of 3)
-      while (collected < bulkCount) {
-        const pagesToFetch = Math.ceil((bulkCount - collected) / ITEMS_PER_PAGE);
-        const batchSize = Math.min(3, pagesToFetch);
-        
-        const promises = [];
-        for (let i = 0; i < batchSize && collected < bulkCount; i++) {
-          promises.push(getArtworksPage(pageNum + i));
-        }
-        
-        const responses = await Promise.all(promises);
-        
-        for (const response of responses) {
+      // Fetch all needed pages in parallel
+      const pagePromises = [];
+      for (let i = 1; i <= pagesToFetch; i++) {
+        pagePromises.push(getArtworksPage(i));
+      }
+      
+      const allPages = await Promise.all(pagePromises);
+      
+      // Collect IDs
+      let collected = 0;
+      for (const pageData of allPages) {
+        for (const item of pageData.data) {
           if (collected >= bulkCount) break;
-          
-          const needed = bulkCount - collected;
-          const batch = response.data.slice(0, needed);
-          
-          batch.forEach(item => {
-            idsToSelect.push(item.id);
-            collected++;
-          });
-          
-          // Update progress
-          setBulkProgress(Math.round((collected / bulkCount) * 100));
+          idsToSelect.push(item.id);
+          collected++;
         }
-        
-        pageNum += batchSize;
-        
-        if (responses.some(r => r.data.length < ITEMS_PER_PAGE)) {
-          break;
-        }
+        if (collected >= bulkCount) break;
       }
 
+      // Update selection
       selectMultiple(idsToSelect);
       
+      // Refresh current page to show selections
       const selected = getSelectedForPage(items);
       setSelectedRows(selected);
       
-      overlayRef.current?.hide();
       setBulkCount(null);
     } catch (err) {
       console.error('Bulk selection failed:', err);
     } finally {
-      setIsBulkSelecting(false);
-      setBulkProgress(0);
+      setIsLoading(false);
     }
   };
 
@@ -130,7 +114,6 @@ export default function Gallery() {
         severity="secondary"
         onClick={(e) => overlayRef.current?.toggle(e)}
         style={{ width: '2rem', height: '2rem' }}
-        disabled={isBulkSelecting}
       />
       <OverlayPanel ref={overlayRef}>
         <div style={{ padding: '1rem', minWidth: '250px' }}>
@@ -144,14 +127,17 @@ export default function Gallery() {
             placeholder="Enter number of rows"
             style={{ width: '100%', marginBottom: '0.5rem' }}
             min={1}
-            max={1000}
+            max={500}
           />
           <Button
             label="Submit"
             onClick={handleBulkSelection}
             style={{ width: '100%' }}
-            disabled={!bulkCount || isBulkSelecting}
+            disabled={!bulkCount}
           />
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#718096' }}>
+            Max 500 rows recommended
+          </p>
         </div>
       </OverlayPanel>
     </div>
@@ -165,16 +151,6 @@ export default function Gallery() {
         <div className="selection-badge">
           Selected: {totalSelected} rows
         </div>
-        
-        {/* Bulk Selection Progress */}
-        {isBulkSelecting && (
-          <div style={{ marginTop: '1rem' }}>
-            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#4a5568' }}>
-              Selecting rows... {bulkProgress}%
-            </p>
-            <ProgressBar value={bulkProgress} />
-          </div>
-        )}
       </div>
 
       {/* Scrollable Content */}
@@ -244,13 +220,13 @@ export default function Gallery() {
           <Button 
             icon="pi pi-angle-double-left" 
             onClick={() => setActivePage(1)}
-            disabled={activePage === 1 || isLoading || isBulkSelecting}
+            disabled={activePage === 1 || isLoading}
             text
           />
           <Button 
             icon="pi pi-angle-left" 
             onClick={() => setActivePage(prev => Math.max(1, prev - 1))}
-            disabled={activePage === 1 || isLoading || isBulkSelecting}
+            disabled={activePage === 1 || isLoading}
             text
           />
           
@@ -261,13 +237,13 @@ export default function Gallery() {
           <Button 
             icon="pi pi-angle-right" 
             onClick={() => setActivePage(prev => prev + 1)}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading || isBulkSelecting}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
             text
           />
           <Button 
             icon="pi pi-angle-double-right" 
             onClick={() => setActivePage(Math.ceil(totalItems / ITEMS_PER_PAGE))}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading || isBulkSelecting}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
             text
           />
           
