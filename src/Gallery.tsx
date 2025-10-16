@@ -1,7 +1,5 @@
-
 import { useState, useEffect, useRef } from 'react';
-import { DataTable } from 'primereact/datatable';
-// DataTablePageEvent
+import { DataTable, DataTablePageEvent } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
@@ -23,27 +21,30 @@ export default function Gallery() {
   const [selectedRows, setSelectedRows] = useState<ArtworkData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const [bulkCount, setBulkCount] = useState<number | null | undefined>(null);
   
   const overlayRef = useRef<OverlayPanel>(null);
-  const { updateSelection, getSelectedForPage, selectMultiple, totalSelected } = useRowSelection();
+  const { selectedIds, updateSelection, selectMultiple, totalSelected } = useRowSelection();
 
   useEffect(() => {
     loadPage(activePage);
   }, [activePage]);
 
+  // Update selected rows whenever items or selectedIds change
+  useEffect(() => {
+    const currentPageSelected = items.filter(item => selectedIds.has(item.id));
+    setSelectedRows(currentPageSelected);
+  }, [items, selectedIds]);
+
   const loadPage = async (page: number) => {
     setIsLoading(true);
     try {
       const response = await getArtworksPage(page);
-      
       setItems(response.data);
       setTotalItems(response.pagination.total);
-      
-      
-      const selected = getSelectedForPage(response.data);
-      setSelectedRows(selected);
+      setTotalPages(response.pagination.total_pages);
     } catch (err) {
       console.error('Failed to load page:', err);
     } finally {
@@ -59,32 +60,29 @@ export default function Gallery() {
   const handleSelectionUpdate = (e: { value: ArtworkData[] }) => {
     const newSelection = e.value;
     
-
-
-    const currentPageIds = items.map(item => item.id);
+    // Get IDs of selected items on current page
+    const selectedIdsOnPage = newSelection.map(item => item.id);
     
-
-    currentPageIds.forEach(id => {
-      updateSelection([{ id } as ArtworkData], []);
-    });
+    // Get IDs of all items on current page
+    const allIdsOnPage = items.map(item => item.id);
     
-
-    updateSelection([], newSelection);
-    
-    setSelectedRows(newSelection);
+    // Update selection in our hook
+    updateSelection(allIdsOnPage, selectedIdsOnPage);
   };
 
   const handleBulkSelection = async () => {
     if (!bulkCount || bulkCount < 1) return;
   
     overlayRef.current?.hide();
+    
+    // Show loading immediately
     setIsLoading(true);
     
     const idsToSelect: number[] = [];
     const pagesToFetch = Math.ceil(bulkCount / ITEMS_PER_PAGE);
   
     try {
-
+      // Fetch all needed pages in parallel
       const pagePromises = [];
       for (let i = 1; i <= pagesToFetch; i++) {
         pagePromises.push(getArtworksPage(i));
@@ -92,7 +90,7 @@ export default function Gallery() {
       
       const allPages = await Promise.all(pagePromises);
       
-
+      // Collect IDs
       let collected = 0;
       for (const pageData of allPages) {
         for (const item of pageData.data) {
@@ -103,16 +101,14 @@ export default function Gallery() {
         if (collected >= bulkCount) break;
       }
   
-
+      // Update selection
       selectMultiple(idsToSelect);
       
-
-      const currentPageResponse = await getArtworksPage(activePage);
-      setItems(currentPageResponse.data);
+      // Navigate to page 1 to show selections
+      setActivePage(1);
       
-
-      const selected = getSelectedForPage(currentPageResponse.data);
-      setSelectedRows(selected);
+      // Reload page 1 data
+      await loadPage(1);
       
       setBulkCount(null);
     } catch (err) {
@@ -162,9 +158,7 @@ export default function Gallery() {
 
   return (
     <div className="gallery-container">
-      
-      
-
+      {/* Sticky Header */}
       <div className="gallery-header">
         <h1>Artwork Collection</h1>
         <div className="selection-badge">
@@ -172,7 +166,7 @@ export default function Gallery() {
         </div>
       </div>
 
-
+      {/* Scrollable Content */}
       <div className="gallery-content">
         {isLoading ? (
           <div className="loading-skeleton">
@@ -233,7 +227,7 @@ export default function Gallery() {
         )}
       </div>
 
-
+      {/* Sticky Footer with Pagination */}
       <div className="gallery-footer">
         <div className="pagination-controls">
           <Button 
@@ -250,19 +244,19 @@ export default function Gallery() {
           />
           
           <span className="page-info">
-            Page {activePage} of {Math.ceil(totalItems / ITEMS_PER_PAGE)}
+            Page {activePage} of {totalPages}
           </span>
           
           <Button 
             icon="pi pi-angle-right" 
             onClick={() => setActivePage(prev => prev + 1)}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            disabled={activePage >= totalPages || isLoading}
             text
           />
           <Button 
             icon="pi pi-angle-double-right" 
-            onClick={() => setActivePage(Math.ceil(totalItems / ITEMS_PER_PAGE))}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            onClick={() => setActivePage(totalPages)}
+            disabled={activePage >= totalPages || isLoading}
             text
           />
           

@@ -1,42 +1,43 @@
-import { useState } from 'react';
+// hooks/useRowSelection.ts
+import { useState, useCallback } from 'react';
 import { ArtworkData } from '../interfaces';
 
-export const useRowSelection = () => {
+export function useRowSelection() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  const updateSelection = (removed: ArtworkData[], added: ArtworkData[]) => {
+  const updateSelection = useCallback((allIdsOnPage: number[], selectedIdsOnPage: number[]) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
       
+      // Remove all current page items first
+      allIdsOnPage.forEach(id => newSet.delete(id));
       
-      removed.forEach(item => newSet.delete(item.id));
-      
-      
-      added.forEach(item => newSet.add(item.id));
+      // Add back the selected ones
+      selectedIdsOnPage.forEach(id => newSet.add(id));
       
       return newSet;
     });
-  };
+  }, []);
 
-  const getSelectedForPage = (pageData: ArtworkData[]): ArtworkData[] => {
-    return pageData.filter(item => selectedIds.has(item.id));
-  };
-
-  const selectMultiple = (ids: number[]) => {
+  const selectMultiple = useCallback((ids: number[]) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
       ids.forEach(id => newSet.add(id));
       return newSet;
     });
-  };
+  }, []);
+
+  const getSelectedForPage = useCallback((pageData: ArtworkData[]): ArtworkData[] => {
+    return pageData.filter(item => selectedIds.has(item.id));
+  }, [selectedIds]);
 
   const totalSelected = selectedIds.size;
 
   return {
+    selectedIds,
     updateSelection,
-    getSelectedForPage,
     selectMultiple,
-    totalSelected,
-    selectedIds 
+    getSelectedForPage,
+    totalSelected
   };
-};
+}
