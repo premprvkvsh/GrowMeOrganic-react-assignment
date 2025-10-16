@@ -25,22 +25,24 @@ export default function Gallery() {
   const [bulkCount, setBulkCount] = useState<number | null | undefined>(null);
   
   const overlayRef = useRef<OverlayPanel>(null);
-  const { updateSelection, getSelectedForPage, selectMultiple, totalSelected } = useRowSelection();
+  const { selectedIds, updateSelection, selectMultiple, totalSelected } = useRowSelection();
 
   useEffect(() => {
     loadPage(activePage);
   }, [activePage]);
 
+  // Update selected rows whenever items or selectedIds change
+  useEffect(() => {
+    const currentPageSelected = items.filter(item => selectedIds.has(item.id));
+    setSelectedRows(currentPageSelected);
+  }, [items, selectedIds]);
+
   const loadPage = async (page: number) => {
     setIsLoading(true);
     try {
       const response = await getArtworksPage(page);
-      
       setItems(response.data);
       setTotalItems(response.pagination.total);
-      
-      const selected = getSelectedForPage(response.data);
-      setSelectedRows(selected);
     } catch (err) {
       console.error('Failed to load page:', err);
     } finally {
@@ -55,13 +57,20 @@ export default function Gallery() {
 
   const handleSelectionUpdate = (e: { value: ArtworkData[] }) => {
     const newSelection = e.value;
-    setSelectedRows(newSelection);
-    updateSelection(items, newSelection);
+    
+    // Get IDs of selected items on current page
+    const selectedIdsOnPage = newSelection.map(item => item.id);
+    
+    // Get IDs of all items on current page
+    const allIdsOnPage = items.map(item => item.id);
+    
+    // Update selection in our hook
+    updateSelection(allIdsOnPage, selectedIdsOnPage);
   };
 
   const handleBulkSelection = async () => {
     if (!bulkCount || bulkCount < 1) return;
-
+  
     overlayRef.current?.hide();
     
     // Show loading immediately
@@ -69,7 +78,7 @@ export default function Gallery() {
     
     const idsToSelect: number[] = [];
     const pagesToFetch = Math.ceil(bulkCount / ITEMS_PER_PAGE);
-
+  
     try {
       // Fetch all needed pages in parallel
       const pagePromises = [];
@@ -89,13 +98,15 @@ export default function Gallery() {
         }
         if (collected >= bulkCount) break;
       }
-
+  
       // Update selection
       selectMultiple(idsToSelect);
       
-      // Refresh current page to show selections
-      const selected = getSelectedForPage(items);
-      setSelectedRows(selected);
+      // Navigate to page 1 to show selections
+      setActivePage(1);
+      
+      // Reload page 1 data
+      await loadPage(1);
       
       setBulkCount(null);
     } catch (err) {

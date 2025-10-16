@@ -1,41 +1,42 @@
+// hooks/useRowSelection.ts
 import { useState, useCallback } from 'react';
-import { ArtworkData } from '../interfaces';
 
 export function useRowSelection() {
-  const [selectedRowIds, setSelectedRowIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  const updateSelection = useCallback((currentPageRows: ArtworkData[], newlySelected: ArtworkData[]) => {
-    setSelectedRowIds(prev => {
-      const updated = new Set(prev);
-      const currentPageRowIds = currentPageRows.map(row => row.id);
+  const updateSelection = useCallback((allIdsOnPage: number[], selectedIdsOnPage: number[]) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
       
-      // Clear current page selections first
-      currentPageRowIds.forEach(id => updated.delete(id));
+      // Remove all current page items first
+      allIdsOnPage.forEach(id => newSet.delete(id));
       
-      // Add new selections
-      newlySelected.forEach(row => updated.add(row.id));
+      // Add back the selected ones
+      selectedIdsOnPage.forEach(id => newSet.add(id));
       
-      return updated;
+      return newSet;
     });
   }, []);
-
-  const getSelectedForPage = useCallback((pageRows: ArtworkData[]) => {
-    return pageRows.filter(row => selectedRowIds.has(row.id));
-  }, [selectedRowIds]);
 
   const selectMultiple = useCallback((ids: number[]) => {
-    setSelectedRowIds(prev => {
-      const updated = new Set(prev);
-      ids.forEach(id => updated.add(id));
-      return updated;
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      ids.forEach(id => newSet.add(id));
+      return newSet;
     });
   }, []);
 
+  const getSelectedForPage = useCallback((pageData: any[]) => {
+    return pageData.filter(item => selectedIds.has(item.id));
+  }, [selectedIds]);
+
+  const totalSelected = selectedIds.size;
+
   return {
-    selectedRowIds,
+    selectedIds,
     updateSelection,
-    getSelectedForPage,
     selectMultiple,
-    totalSelected: selectedRowIds.size
+    getSelectedForPage,
+    totalSelected
   };
 }
