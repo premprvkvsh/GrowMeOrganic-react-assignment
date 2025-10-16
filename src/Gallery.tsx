@@ -163,7 +163,7 @@ export default function Gallery() {
     <div className="gallery-container">
       
       
-      //header section
+
       <div className="gallery-header">
         <h1>Artwork Collection</h1>
         <div className="selection-badge">
@@ -171,7 +171,7 @@ export default function Gallery() {
         </div>
       </div>
 
-      //scrollable section
+
       <div className="gallery-content">
         {isLoading ? (
           <div className="loading-skeleton">
@@ -232,7 +232,7 @@ export default function Gallery() {
         )}
       </div>
 
-      //pagination section
+
       <div className="gallery-footer">
         <div className="pagination-controls">
           <Button 
