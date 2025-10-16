@@ -5,6 +5,7 @@ import { OverlayPanel } from 'primereact/overlaypanel';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
 import { Skeleton } from 'primereact/skeleton';
+import { ProgressBar } from 'primereact/progressbar';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
@@ -20,6 +21,8 @@ export default function Gallery() {
   const [items, setItems] = useState<ArtworkData[]>([]);
   const [selectedRows, setSelectedRows] = useState<ArtworkData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBulkSelecting, setIsBulkSelecting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [activePage, setActivePage] = useState(1);
   const [bulkCount, setBulkCount] = useState<number | null | undefined>(null);
@@ -35,7 +38,6 @@ export default function Gallery() {
     setIsLoading(true);
     try {
       const response = await getArtworksPage(page);
-      await new Promise(resolve => setTimeout(resolve, 100));
       
       setItems(response.data);
       setTotalItems(response.pagination.total);
@@ -63,26 +65,45 @@ export default function Gallery() {
   const handleBulkSelection = async () => {
     if (!bulkCount || bulkCount < 1) return;
 
-    setIsLoading(true);
+    setIsBulkSelecting(true);
+    setBulkProgress(0);
     const idsToSelect: number[] = [];
     let collected = 0;
     let pageNum = 1;
 
     try {
+      // Fetch pages in parallel (batches of 3)
       while (collected < bulkCount) {
-        const response = await getArtworksPage(pageNum);
-        const needed = bulkCount - collected;
-        const batch = response.data.slice(0, needed);
+        const pagesToFetch = Math.ceil((bulkCount - collected) / ITEMS_PER_PAGE);
+        const batchSize = Math.min(3, pagesToFetch);
         
-        batch.forEach(item => {
-          idsToSelect.push(item.id);
-          collected++;
-        });
-
-        if (response.data.length < ITEMS_PER_PAGE || collected >= bulkCount) {
+        const promises = [];
+        for (let i = 0; i < batchSize && collected < bulkCount; i++) {
+          promises.push(getArtworksPage(pageNum + i));
+        }
+        
+        const responses = await Promise.all(promises);
+        
+        for (const response of responses) {
+          if (collected >= bulkCount) break;
+          
+          const needed = bulkCount - collected;
+          const batch = response.data.slice(0, needed);
+          
+          batch.forEach(item => {
+            idsToSelect.push(item.id);
+            collected++;
+          });
+          
+          // Update progress
+          setBulkProgress(Math.round((collected / bulkCount) * 100));
+        }
+        
+        pageNum += batchSize;
+        
+        if (responses.some(r => r.data.length < ITEMS_PER_PAGE)) {
           break;
         }
-        pageNum++;
       }
 
       selectMultiple(idsToSelect);
@@ -95,7 +116,8 @@ export default function Gallery() {
     } catch (err) {
       console.error('Bulk selection failed:', err);
     } finally {
-      setIsLoading(false);
+      setIsBulkSelecting(false);
+      setBulkProgress(0);
     }
   };
 
@@ -108,6 +130,7 @@ export default function Gallery() {
         severity="secondary"
         onClick={(e) => overlayRef.current?.toggle(e)}
         style={{ width: '2rem', height: '2rem' }}
+        disabled={isBulkSelecting}
       />
       <OverlayPanel ref={overlayRef}>
         <div style={{ padding: '1rem', minWidth: '250px' }}>
@@ -121,19 +144,18 @@ export default function Gallery() {
             placeholder="Enter number of rows"
             style={{ width: '100%', marginBottom: '0.5rem' }}
             min={1}
+            max={1000}
           />
           <Button
             label="Submit"
             onClick={handleBulkSelection}
             style={{ width: '100%' }}
-            disabled={!bulkCount}
+            disabled={!bulkCount || isBulkSelecting}
           />
         </div>
       </OverlayPanel>
     </div>
   );
-
-  const skeletonTemplate = () => <Skeleton />;
 
   return (
     <div className="gallery-container">
@@ -143,61 +165,77 @@ export default function Gallery() {
         <div className="selection-badge">
           Selected: {totalSelected} rows
         </div>
+        
+        {/* Bulk Selection Progress */}
+        {isBulkSelecting && (
+          <div style={{ marginTop: '1rem' }}>
+            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#4a5568' }}>
+              Selecting rows... {bulkProgress}%
+            </p>
+            <ProgressBar value={bulkProgress} />
+          </div>
+        )}
       </div>
 
       {/* Scrollable Content */}
       <div className="gallery-content">
-        <DataTable
-          value={isLoading ? Array(12).fill({}) : items}
-          selection={selectedRows}
-          onSelectionChange={handleSelectionUpdate}
-          dataKey="id"
-          lazy
-          first={(activePage - 1) * ITEMS_PER_PAGE}
-          rows={ITEMS_PER_PAGE}
-          totalRecords={totalItems}
-          tableStyle={{ minWidth: '60rem' }}
-          selectionMode="multiple"
-        >
-          <Column 
-            selectionMode="multiple" 
-            headerStyle={{ width: '3rem' }}
-            header={renderSelectionHeader}
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="title" 
-            header="Title" 
-            style={{ minWidth: '200px' }}
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="place_of_origin" 
-            header="Place of Origin"
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="artist_display" 
-            header="Artist" 
-            style={{ minWidth: '200px' }}
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="inscriptions" 
-            header="Inscriptions"
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="date_start" 
-            header="Date Start"
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-          <Column 
-            field="date_end" 
-            header="Date End"
-            body={isLoading ? skeletonTemplate : undefined}
-          />
-        </DataTable>
+        {isLoading ? (
+          <div className="loading-skeleton">
+            <Skeleton height="3rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+            <Skeleton height="2rem" className="mb-2" />
+          </div>
+        ) : (
+          <DataTable
+            value={items}
+            selection={selectedRows}
+            onSelectionChange={handleSelectionUpdate}
+            dataKey="id"
+            tableStyle={{ minWidth: '60rem' }}
+            selectionMode="multiple"
+          >
+            <Column 
+              selectionMode="multiple" 
+              headerStyle={{ width: '3rem' }}
+              header={renderSelectionHeader}
+            />
+            <Column 
+              field="title" 
+              header="Title" 
+              style={{ minWidth: '200px' }}
+            />
+            <Column 
+              field="place_of_origin" 
+              header="Place of Origin"
+            />
+            <Column 
+              field="artist_display" 
+              header="Artist" 
+              style={{ minWidth: '200px' }}
+            />
+            <Column 
+              field="inscriptions" 
+              header="Inscriptions"
+            />
+            <Column 
+              field="date_start" 
+              header="Date Start"
+            />
+            <Column 
+              field="date_end" 
+              header="Date End"
+            />
+          </DataTable>
+        )}
       </div>
 
       {/* Sticky Footer with Pagination */}
@@ -206,13 +244,13 @@ export default function Gallery() {
           <Button 
             icon="pi pi-angle-double-left" 
             onClick={() => setActivePage(1)}
-            disabled={activePage === 1 || isLoading}
+            disabled={activePage === 1 || isLoading || isBulkSelecting}
             text
           />
           <Button 
             icon="pi pi-angle-left" 
             onClick={() => setActivePage(prev => Math.max(1, prev - 1))}
-            disabled={activePage === 1 || isLoading}
+            disabled={activePage === 1 || isLoading || isBulkSelecting}
             text
           />
           
@@ -223,18 +261,18 @@ export default function Gallery() {
           <Button 
             icon="pi pi-angle-right" 
             onClick={() => setActivePage(prev => prev + 1)}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading || isBulkSelecting}
             text
           />
           <Button 
             icon="pi pi-angle-double-right" 
             onClick={() => setActivePage(Math.ceil(totalItems / ITEMS_PER_PAGE))}
-            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading || isBulkSelecting}
             text
           />
           
           <span className="total-info">
-            Showing {(activePage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(activePage * ITEMS_PER_PAGE, totalItems)} of {totalItems} artworks
+            Showing {(activePage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(activePage * ITEMS_PER_PAGE, totalItems)} of {totalItems.toLocaleString()} artworks
           </span>
         </div>
       </div>

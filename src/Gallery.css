@@ -42,6 +42,18 @@
     background: #f7fafc;
   }
   
+  /* Loading Skeleton */
+  .loading-skeleton {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  
+  .loading-skeleton .mb-2 {
+    margin-bottom: 0.5rem;
+  }
+  
   /* Table Styling */
   .p-datatable {
     background: white;
@@ -101,7 +113,7 @@
     margin-left: auto;
   }
   
-  /* Skeleton Loading */
+  /* Skeleton Loading Animation */
   .p-skeleton {
     background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
     background-size: 200% 100%;
