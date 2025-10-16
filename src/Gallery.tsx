@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { DataTable, DataTablePageEvent } from 'primereact/datatable';
+import { DataTable } from 'primereact/datatable';
+// DataTablePageEvent
 import { Column } from 'primereact/column';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
@@ -50,10 +51,10 @@ export default function Gallery() {
     }
   };
 
-  const handlePageSwitch = (e: DataTablePageEvent) => {
-    const newPage = Math.floor(e.first / e.rows) + 1;
-    setActivePage(newPage);
-  };
+//   const handlePageSwitch = (e: DataTablePageEvent) => {
+//     const newPage = Math.floor(e.first / e.rows) + 1;
+//     setActivePage(newPage);
+//   };
 
   const handleSelectionUpdate = (e: { value: ArtworkData[] }) => {
     const newSelection = e.value;
