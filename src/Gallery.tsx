@@ -4,9 +4,11 @@ import { Column } from 'primereact/column';
 import { OverlayPanel } from 'primereact/overlaypanel';
 import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
+import { Skeleton } from 'primereact/skeleton';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
+import './Gallery.css';
 
 import { ArtworkData } from './interfaces';
 import { getArtworksPage } from './utils/api';
@@ -33,10 +35,11 @@ export default function Gallery() {
     setIsLoading(true);
     try {
       const response = await getArtworksPage(page);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       setItems(response.data);
       setTotalItems(response.pagination.total);
       
-      // Match selections from our tracking
       const selected = getSelectedForPage(response.data);
       setSelectedRows(selected);
     } catch (err) {
@@ -84,7 +87,6 @@ export default function Gallery() {
 
       selectMultiple(idsToSelect);
       
-      // Refresh current page selections
       const selected = getSelectedForPage(items);
       setSelectedRows(selected);
       
@@ -131,49 +133,111 @@ export default function Gallery() {
     </div>
   );
 
+  const skeletonTemplate = () => <Skeleton />;
+
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Artwork Collection</h1>
-      
-      <div style={{ 
-        marginBottom: '1rem', 
-        padding: '1rem', 
-        background: '#f8f9fa', 
-        borderRadius: '8px',
-        fontWeight: 'bold'
-      }}>
-        Selected: {totalSelected} rows
+    <div className="gallery-container">
+      {/* Sticky Header */}
+      <div className="gallery-header">
+        <h1>Artwork Collection</h1>
+        <div className="selection-badge">
+          Selected: {totalSelected} rows
+        </div>
       </div>
 
-      <DataTable
-        value={items}
-        selection={selectedRows}
-        onSelectionChange={handleSelectionUpdate}
-        dataKey="id"
-        loading={isLoading}
-        paginator
-        lazy
-        first={(activePage - 1) * ITEMS_PER_PAGE}
-        rows={ITEMS_PER_PAGE}
-        totalRecords={totalItems}
-        onPage={handlePageSwitch}
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-        currentPageReportTemplate="Showing {first} to {last} of {totalRecords} artworks"
-        tableStyle={{ minWidth: '60rem' }}
-        selectionMode="multiple"
-      >
-        <Column 
-          selectionMode="multiple" 
-          headerStyle={{ width: '3rem' }}
-          header={renderSelectionHeader}
-        />
-        <Column field="title" header="Title" style={{ minWidth: '200px' }} />
-        <Column field="place_of_origin" header="Place of Origin" />
-        <Column field="artist_display" header="Artist" style={{ minWidth: '200px' }} />
-        <Column field="inscriptions" header="Inscriptions" />
-        <Column field="date_start" header="Date Start" />
-        <Column field="date_end" header="Date End" />
-      </DataTable>
+      {/* Scrollable Content */}
+      <div className="gallery-content">
+        <DataTable
+          value={isLoading ? Array(12).fill({}) : items}
+          selection={selectedRows}
+          onSelectionChange={handleSelectionUpdate}
+          dataKey="id"
+          lazy
+          first={(activePage - 1) * ITEMS_PER_PAGE}
+          rows={ITEMS_PER_PAGE}
+          totalRecords={totalItems}
+          tableStyle={{ minWidth: '60rem' }}
+          selectionMode="multiple"
+        >
+          <Column 
+            selectionMode="multiple" 
+            headerStyle={{ width: '3rem' }}
+            header={renderSelectionHeader}
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="title" 
+            header="Title" 
+            style={{ minWidth: '200px' }}
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="place_of_origin" 
+            header="Place of Origin"
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="artist_display" 
+            header="Artist" 
+            style={{ minWidth: '200px' }}
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="inscriptions" 
+            header="Inscriptions"
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="date_start" 
+            header="Date Start"
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+          <Column 
+            field="date_end" 
+            header="Date End"
+            body={isLoading ? skeletonTemplate : undefined}
+          />
+        </DataTable>
+      </div>
+
+      {/* Sticky Footer with Pagination */}
+      <div className="gallery-footer">
+        <div className="pagination-controls">
+          <Button 
+            icon="pi pi-angle-double-left" 
+            onClick={() => setActivePage(1)}
+            disabled={activePage === 1 || isLoading}
+            text
+          />
+          <Button 
+            icon="pi pi-angle-left" 
+            onClick={() => setActivePage(prev => Math.max(1, prev - 1))}
+            disabled={activePage === 1 || isLoading}
+            text
+          />
+          
+          <span className="page-info">
+            Page {activePage} of {Math.ceil(totalItems / ITEMS_PER_PAGE)}
+          </span>
+          
+          <Button 
+            icon="pi pi-angle-right" 
+            onClick={() => setActivePage(prev => prev + 1)}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            text
+          />
+          <Button 
+            icon="pi pi-angle-double-right" 
+            onClick={() => setActivePage(Math.ceil(totalItems / ITEMS_PER_PAGE))}
+            disabled={activePage >= Math.ceil(totalItems / ITEMS_PER_PAGE) || isLoading}
+            text
+          />
+          
+          <span className="total-info">
+            Showing {(activePage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(activePage * ITEMS_PER_PAGE, totalItems)} of {totalItems} artworks
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
