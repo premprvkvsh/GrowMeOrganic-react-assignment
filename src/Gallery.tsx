@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { DataTable, DataTablePageEvent, DataTableSelectionChangeEvent } from 'primereact/datatable';
+import { DataTable, DataTablePageEvent } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { OverlayPanel } from 'primereact/overlaypanel';
-import { InputNumber } from 'primereact/inputnumber';
+import { InputNumber, InputNumberValueChangeEvent } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
@@ -20,10 +20,10 @@ export default function Gallery() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [activePage, setActivePage] = useState(1);
-  const [bulkCount, setBulkCount] = useState<number | null>(null);
+  const [bulkCount, setBulkCount] = useState<number | null | undefined>(null);
   
   const overlayRef = useRef<OverlayPanel>(null);
-  const { selectedRowIds, updateSelection, getSelectedForPage, selectMultiple, totalSelected } = useRowSelection();
+  const { updateSelection, getSelectedForPage, selectMultiple, totalSelected } = useRowSelection();
 
   useEffect(() => {
     loadPage(activePage);
@@ -51,7 +51,7 @@ export default function Gallery() {
     setActivePage(newPage);
   };
 
-  const handleSelectionUpdate = (e: DataTableSelectionChangeEvent<ArtworkData[]>) => {
+  const handleSelectionUpdate = (e: { value: ArtworkData[] }) => {
     const newSelection = e.value;
     setSelectedRows(newSelection);
     updateSelection(items, newSelection);
@@ -114,8 +114,8 @@ export default function Gallery() {
           </label>
           <InputNumber
             id="row-count"
-            value={bulkCount}
-            onValueChange={(e) => setBulkCount(e.value)}
+            value={bulkCount ?? null}
+            onValueChange={(e: InputNumberValueChangeEvent) => setBulkCount(e.value)}
             placeholder="Enter number of rows"
             style={{ width: '100%', marginBottom: '0.5rem' }}
             min={1}
