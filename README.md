@@ -2,6 +2,8 @@
 
 A React application for browsing artworks with persistent multi-page selection.
 
+**[ Live Demo](https://growmeorganicreact-assignment.netlify.app/)**
+
 ## Tech Stack
 
 - React + TypeScript
